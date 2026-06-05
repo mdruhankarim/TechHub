@@ -1,9 +1,8 @@
 import { Outlet } from "react-router-dom";
 import Footer from "./components/common/Footer";
-import Header from "./components/common/navbar/Header";
 import ChatWidget from "./components/common/ChatWidget";
-import { useGetProfile } from "./hooks/user.query";
-import DemoNav from "./components/common/navbar/DemoNav";
+// import { useGetProfile } from "./hooks/user.query";
+import Navbar from "./components/common/Navbar";
 
 function App() {
   // const { data } = useGetProfile();
@@ -11,9 +10,7 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
-      <DemoNav/>
-      {/* <Header /> */}
-
+      <Navbar />
       <main className="flex-1">
         <Outlet />
       </main>

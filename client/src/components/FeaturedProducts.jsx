@@ -22,7 +22,7 @@ const FeaturedProducts = () => {
   // 1. FIXED LOADING STATE: Added explicit 'return' statement
   if (isLoading) {
     return (
-      <section className="py-12 px-4 max-w-7xl mx-auto sm:px-6 lg:px-8">
+      <section className="px-4 mx-auto sm:px-6 lg:px-8">
         {/* Skeleton Header */}
         <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
           <div className="space-y-2 w-1/3">
@@ -54,7 +54,7 @@ const FeaturedProducts = () => {
   const products = data?.data?.products?.slice(0,8) || [];
 
   return (
-    <section className="py-12 px-4 max-w-7xl mx-auto sm:px-6 lg:px-8">
+    <section className="py-12 px-4 container mx-auto sm:px-6 lg:px-8">
       {/* Real-World E-commerce Header Row */}
       <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
         <div>
@@ -85,7 +85,7 @@ const FeaturedProducts = () => {
           No featured products available right now.
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
           {products.map((product, index) => (
             <ProductCard
               key={product._id}

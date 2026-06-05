@@ -1,14 +1,50 @@
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import React from "react";
+import { Search, ChevronDown, LayoutGrid } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CATEGORIES } from "./NavData";
 
-export default function SearchBar() {
-  return (
-    <div className="hidden md:flex flex-1 max-w-xs items-center border border-gray-200 rounded-md px-3 py-1.5 gap-2 bg-white focus-within:ring-1 focus-within:ring-gray-300">
-      <Input
-        placeholder="Search..."
-        className="border-0 bg-transparent p-0 h-auto text-sm focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none placeholder:text-gray-400"
-      />
-      <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-    </div>
-  );
-}
+const SearchBar = ({ selectedCategory, onCategoryChange }) => (
+  <div className="hidden lg:flex flex-1 max-w-3xl items-center border border-gray-200 rounded-xl bg-[#F8F9FA] h-12 relative pl-2 mx-4">
+    <DropdownMenu>
+      <DropdownMenuTrigger className="h-full px-4 flex items-center gap-2 text-sm text-gray-700 font-medium hover:text-orange-600 transition-colors whitespace-nowrap outline-none">
+        <LayoutGrid size={14} className="text-gray-500" />
+        {selectedCategory}
+        <ChevronDown size={14} className="text-gray-400" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-[100]"
+      >
+        {CATEGORIES.map((cat, idx) => (
+          <DropdownMenuItem
+            key={idx}
+            onClick={() => onCategoryChange(cat)}
+            className="px-4 py-2 text-sm text-gray-600 data-[focused]:bg-orange-50 data-[focused]:text-orange-600 rounded-lg cursor-pointer transition-colors outline-none"
+          >
+            {cat}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+
+    <span className="h-5 w-[1px] bg-gray-200 self-center" />
+
+    <input
+      type="text"
+      placeholder="Search products, brands and categories..."
+      className="w-full bg-transparent px-4 text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+    />
+
+    <button className="h-10 bg-black hover:bg-orange-600 transition-colors px-6 text-white rounded-lg flex items-center gap-2 font-medium text-sm mr-1 shadow-sm">
+      <Search size={16} />
+      <span>Search</span>
+    </button>
+  </div>
+);
+
+export default SearchBar;

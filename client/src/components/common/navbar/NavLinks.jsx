@@ -1,26 +1,34 @@
-// NavLinks.jsx
+import { NAV_LINKS } from "./NavData";
 
-import { Link } from "react-router-dom";
-
-export const navLinks = [
-  { label: "Laptops", href: "#" },
-  { label: "Phones", href: "#" },
-  { label: "Audio", href: "#" },
-  { label: "Accessories", href: "#" },
-];
-
-export default function NavLinks() {
-  return (
-    <nav className="hidden lg:flex items-center gap-5">
-      {navLinks.map((link) => (
-        <Link
-          key={link.label}
-          to={link.href}
-          className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+// Each link gets its own GSAP hover animation via delegated handlers passed in
+// from the parent (which owns the contextSafe scope).
+const NavLinks = ({ onMouseEnter, onMouseLeave }) => (
+  <div className="hidden lg:flex items-center justify-start border-t border-gray-100 py-3 h-12 overflow-hidden">
+    <nav className="flex items-center gap-8">
+      {NAV_LINKS.map((link, idx) => (
+        <div
+          key={idx}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          className="relative cursor-pointer h-6 overflow-hidden group/link"
         >
-          {link.label}
-        </Link>
+          <span
+            className={`nav-primary block text-[14px] font-bold tracking-wide transform will-change-transform ${
+              idx === 0 ? "text-orange-600" : "text-gray-700"
+            }`}
+          >
+            {link}
+            {idx === 0 && (
+              <span className="absolute bottom-0 left-0 w-4 h-[2px] bg-orange-600 rounded-full" />
+            )}
+          </span>
+          <span className="nav-secondary block text-[14px] font-bold tracking-wide text-orange-600 absolute top-full left-0 transform will-change-transform">
+            {link}
+          </span>
+        </div>
       ))}
     </nav>
-  );
-}
+  </div>
+);
+
+export default NavLinks;
