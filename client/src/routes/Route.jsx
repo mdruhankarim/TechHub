@@ -7,7 +7,7 @@ import Home from "@/pages/Home";
 import Login from "@/pages/Auth/Login";
 import Register from "@/pages/Auth/Register";
 import { ProtectedRoutes } from "./ProtectedRoutes";
-
+import ProductPage from "@/pages/ProductPage";
 
 const router = createBrowserRouter([
   {
@@ -17,11 +17,12 @@ const router = createBrowserRouter([
       {
         index: true,
         element: (
-          <ProtectedRoutes>
-            <Home />
-          </ProtectedRoutes>
+          // <ProtectedRoutes>
+          <Home />
+          // </ProtectedRoutes>
         ),
       },
+      { path: "/products", element: <ProductPage /> },
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
 
