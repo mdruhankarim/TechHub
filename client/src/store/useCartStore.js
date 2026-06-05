@@ -5,60 +5,46 @@ import { devtools } from "zustand/middleware";
 export const useCartStore = create(
   devtools(
     (set, get) => ({
+      // কার্টের ইনিশিয়াল স্টেট (অবজেক্ট হিসেবে থাকছে ওয়ান-ক্লিক ও ওয়ান-লুকআপ ওয়ান-টাইম ওয়ান অপটিমাইজেশনের জন্য)
       cart: {},
 
-      // ADD TO CART (Accepts the full product object now)
-      addToCart: (product) => {
-        const { productId, stock } = product;
-        const currentItem = get().cart[productId];
-        const currentQty = currentItem ? currentItem.quantity : 0;
-
-        // Prevent exceeding stock
-        if (currentQty >= stock) return;
-
-        set((state) => ({
-          cart: {
-            ...state.cart,
-            [productId]: {
-              ...product,
-              quantity: currentQty + 1,
-            },
-          },
-        }));
-      },
-
-      // DECREASE QUANTITY
-      decreaseQuantity: (productId) => {
-        const currentItem = get().cart[productId];
-        if (!currentItem) return;
-
-        // REMOVE ITEM WHEN QUANTITY DROPS BELOW 1
-        if (currentItem.quantity <= 1) {
-          const updatedCart = { ...get().cart };
-          delete updatedCart[productId];
-          set({ cart: updatedCart });
+      /**
+       * ১. SET CART (ডাটাবেজ থেকে ডেটা সিঙ্ক করার জন্য)
+       * TanStack Query-এর onSuccess বা রেন্ডার ব্লকে এটি কল হবে।
+       * ব্যাকএন্ডের অ্যারে ডেটাকে ফ্রন্টএন্ডের জন্য প্রোডাক্ট আইডি-ভিত্তিক অবজেক্টে রূপান্তর করে।
+       */
+      setCart: (cartItems) => {
+        if (!cartItems || !Array.isArray(cartItems)) {
+          set({ cart: {} });
           return;
         }
 
-        set((state) => ({
-          cart: {
-            ...state.cart,
-            [productId]: {
-              ...currentItem,
-              quantity: currentItem.quantity - 1,
-            },
-          },
-        }));
+        const cartObj = {};
+        cartItems.forEach((item) => {
+          // আপনার ব্যাকএন্ডে পপুলেট করা productId অবজেক্ট বা শুধু আইডি দুটির জন্যই সেফটি চেক
+          const id = item.productId?._id || item.productId;
+
+          if (id) {
+            cartObj[id] = {
+              productId: id,
+              quantity: item.quantity,
+              price: item.priceAtAdd,
+              // যদি প্রোডাক্টের অন্য কোনো ডিটেইলস পপুলেট করা থাকে, তা এখানে চলে আসবে
+              title: item.productId?.title || "",
+              image: item.productId?.image || "",
+              slug: item.productId?.slug || "",
+              stock: item.productId?.stock || 0,
+            };
+          }
+        });
+
+        set({ cart: cartObj });
       },
 
-      // REMOVE PRODUCT COMPLETELY
-      removeFromCart: (productId) => {
-        const updatedCart = { ...get().cart };
-        delete updatedCart[productId];
-        set({ cart: updatedCart });
-      },
-
-      // CLEAR CART
+      /**
+       * ২. CLEAR CART
+       * ইউজার লগআউট করলে বা অর্ডার কমপ্লিট হয়ে গেলে কার্ট ফাঁকা করার জন্য
+       */
       clearCart: () => set({ cart: {} }),
     }),
     { name: "cartStore" },
