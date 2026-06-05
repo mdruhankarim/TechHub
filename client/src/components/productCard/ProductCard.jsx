@@ -1,8 +1,5 @@
-// PATH: src/components/products/productCard/ProductCard.jsx
-// FILE: ProductCard.jsx
-
 import React from "react";
-import { Link } from "react-router-dom"; // FIXED: Changed to react-router-dom
+import { Link } from "react-router-dom";
 import ProductBadge from "./ProductBadge";
 import ProductActions from "./ProductActions";
 import ProductRating from "./ProductRating";
@@ -26,7 +23,6 @@ const ProductCard = ({
 }) => {
   return (
     <div className="group relative w-full rounded-xl border border-gray-200 bg-white p-3 sm:p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md overflow-hidden flex flex-col">
-
       <ProductBadge badge={badge} isWishlisted={isWishlisted} />
 
       {/* FIXED: Changed href to 'to' for React Router Navigation */}
@@ -57,7 +53,15 @@ const ProductCard = ({
         <ProductPrice price={price} oldPrice={oldPrice} stock={stock} />
 
         <div className="mt-auto">
-          <AddToCartButton outOfStock={outOfStock} />
+          <AddToCartButton
+            outOfStock={outOfStock}
+            stock={stock}
+            productId={productId}
+            image={image}
+            title={title}
+            slug={slug}
+            price={price}
+          />
         </div>
       </div>
     </div>

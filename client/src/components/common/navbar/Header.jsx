@@ -1,7 +1,6 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useCartStore } from "@/store/useCartStore"; // Import store
 
 import Logo from "./Logo";
 import NavLinks, { navLinks } from "./NavLinks";
@@ -10,9 +9,18 @@ import Actions from "./Actions";
 import MobileMenu from "./MobileMenu";
 
 const Header = () => {
-  const [cartCount, setCartCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Read current live cart state from Zustand
+  const cart = useCartStore((state) => state.cart);
+
+  // FIXED: Added optional chaining (?.) and a fallback (|| 0) to prevent
+  // runtime crashes if cart items don't strictly exist yet during initial state sync
+  const cartCount = Object.values(cart).reduce(
+    (total, item) => total + (item?.quantity || 0),
+    0,
+  );
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 8);
@@ -34,7 +42,7 @@ const Header = () => {
           <SearchBar />
 
           <div className="flex items-center gap-2 shrink-0">
-            <Actions cartCount={cartCount} />
+            <Actions />
             <MobileMenu
               cartCount={cartCount}
               mobileOpen={mobileOpen}
@@ -47,4 +55,5 @@ const Header = () => {
     </header>
   );
 };
+
 export default Header;
