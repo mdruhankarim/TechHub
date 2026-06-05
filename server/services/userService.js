@@ -12,7 +12,7 @@ const userService = {
       throw new Error("EMAIL_ALREADY_EXISTS");
     }
 
-    // has password
+    // hash password
     const salt = await bcryptjs.genSalt(12);
     const hashedPassword = await bcryptjs.hash(password, salt);
     const emailVerifyToken = crypto.randomBytes(32).toString("hex");

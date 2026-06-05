@@ -16,6 +16,10 @@ import {
 import authMiddleware from "../middleware/authMiddleware.js";
 import { upload } from "../middleware/multerMiddleware.js";
 import { otpRateLimiter } from "../middleware/otpRateLimiter.js";
+import {
+  addToCartController,
+  removeFromCartController,
+} from "../controllers/cart.controller.js";
 
 const userRouter = Router();
 
@@ -50,5 +54,11 @@ userRouter.put(
   upload.single("avatar"),
   updateAvatarController,
 );
+
+/**
+ * CART
+ */
+userRouter.post("/cart/add", authMiddleware, addToCartController);
+userRouter.post("/cart/remove", authMiddleware, removeFromCartController);
 
 export default userRouter;
