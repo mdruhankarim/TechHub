@@ -5,8 +5,8 @@ import ChatWidget from "./components/common/ChatWidget";
 import { useGetProfile } from "./hooks/user.query";
 
 function App() {
-  const { data } = useGetProfile();
-  console.log(data);
+  // const { data } = useGetProfile();
+  // console.log(data);
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">

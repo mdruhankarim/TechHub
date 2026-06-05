@@ -1,4 +1,5 @@
-
+import CreateProductPage from "./Dashboard/AddProduct";
+import UpdateProductPage from "./Dashboard/Updateproductpage";
 
 const Home = () => {
   // const { auth } = useAuth();
@@ -6,7 +7,8 @@ const Home = () => {
 
   return (
     <div className="">
-      This is home page
+      {/* <CreateProductPage /> */}
+      {/* <UpdateProductPage/> */}
     </div>
   );
 };
