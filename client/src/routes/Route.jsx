@@ -5,8 +5,10 @@ import App from "@/App";
 import Home from "@/pages/Home";
 import Login from "@/pages/Auth/Login";
 import Register from "@/pages/Auth/Register";
-import ProductPage from "@/pages/ProductPage";
+
 import NotFound from "@/components/NotFound";
+import ProductsPage from "@/pages/ProductPage";
+
 
 
 const router = createBrowserRouter([
@@ -15,7 +17,7 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <Home /> },
-      { path: "/products", element: <ProductPage /> },
+      { path: "/products", element: <ProductsPage /> },
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
     ],
