@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Initialize the Google Gen AI client instance
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-});
+// Define high-availability model pools to safely bypass transient 503 high-demand errors
+const primaryModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const backupModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
 // ─────────────────────────────────────────────
 // Search Filter — AI Category Detection
@@ -24,7 +25,17 @@ Query: "${search}"
 `;
 
   try {
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      result = await primaryModel.generateContent(prompt);
+    } catch (err) {
+      if (err.message.includes("503") || err.message.includes("demand")) {
+        console.warn("Primary engine busy. Switching to backup array for category identification context...");
+        result = await backupModel.generateContent(prompt);
+      } else {
+        throw err;
+      }
+    }
 
     let aiText =
       result?.response?.candidates?.[0]?.content?.parts?.[0]?.text
@@ -50,99 +61,137 @@ Query: "${search}"
 };
 
 // ─────────────────────────────────────────────
-// Chat Assistant — Professional Prompt
+// Chat Assistant — Professional Systems Engineer Prompt
 // ─────────────────────────────────────────────
-export const chatWithAssistant = async (userMessage, products) => {
+export const chatWithAssistant = async (userMessage, products, history = []) => {
   if (!userMessage || userMessage.trim() === "") return null;
 
-  // Build product context — image excluded (sent via imageMap separately)
+  // Dictionary map to preserve real raw URLs away from Gemini context filters
+  const imageMap = {};
+
+  // Build rigorous hardware context profile using safe referencing markers
   const productContext = products
-    .map(
-      (p, i) =>
-        `[${i + 1}] title:"${p.title}" | price:${p.price} | category:${p.category} | stock:${p.stock} | slug:"${p.slug}"`,
-    )
+    .map((p, i) => {
+      let primaryImage = "";
+
+      // Comprehensive Data Normalization Strategy for Images
+      if (p.images && Array.isArray(p.images) && p.images.length > 0 && p.images[0].url) {
+        primaryImage = p.images[0].url;
+      } else if (p.images && Array.isArray(p.images) && p.images.length > 0 && typeof p.images[0] === "string") {
+        primaryImage = p.images[0];
+      } else if (p.image && typeof p.image === "string") {
+        primaryImage = p.image;
+      } else if (p.img && typeof p.img === "string") {
+        primaryImage = p.img;
+      } else if (p.imageUrl && typeof p.imageUrl === "string") {
+        primaryImage = p.imageUrl;
+      } else {
+        primaryImage = "https://images.unsplash.com/photo-1587202372470-682d5022314c?w=600";
+      }
+
+      const refKey = `IMAGE_REF_${i + 1}`;
+      imageMap[refKey] = primaryImage;
+
+      return `[${i + 1}] title:"${p.title}" | price:${p.price} | category:${p.category} | stock:${p.stock} | slug:"${p.slug}" | image:"${refKey}" | desc:"${p.description || ""}"`;
+    })
+    .join("\n");
+
+  const historyContext = history
+    .map((msg) => `${msg.isUser ? "Customer" : "TechHub Engineer"}: ${msg.text}`)
     .join("\n");
 
   const prompt = `
-You are TechHub AI — an expert, friendly sales assistant for TechHub, a premium computer and electronics store in Bangladesh.
+You are TechHub AI — an elite Senior Systems Architect, hardware engineer, and highly technical sales advisor for TechHub, Bangladesh's premium computing enterprise.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LIVE PRODUCT DATABASE (these are the ONLY products that exist):
+LIVE SYSTEM HARDWARE DATABASE (These are the ONLY items available in existence):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${productContext}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOUR PERSONALITY:
+CONVERSATION BACKGROUND ARCHIVE (CRITICAL FOR MULTI-LINE / BURST TEXTS):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Helpful, honest, and knowledgeable like a real tech expert
-- Never pushy or salesy
-- Give honest comparisons when asked
-- Suggest the best value option, not just the most expensive
+${historyContext || "No previous turns recorded in this session."}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LANGUAGE RULES:
+ENGINEERING PERSONA & ATTRIBUTE MATRIX:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Detect the user's language and ALWAYS reply in the SAME language
-- Bangla message → reply in Bangla
-- English message → reply in English
-- Mixed message → reply in mixed (match their style)
+- You approach queries with deep technical authority. Speak directly regarding specific technical properties (e.g., thermal thresholds, power limits, architecture generations).
+- Always evaluate systemic balances. If a consumer specifies an under-powered power unit or processor mismatch, flag the dynamic error immediately.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RESPONSE FORMAT — STRICTLY FOLLOW:
+LANGUAGE & BANGLADESHI CHAT CULTURE RULES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Your response must have exactly TWO sections:
-
-SECTION 1 — TEXT (always comes first):
-- Maximum 2-3 short sentences
-- Plain text only — absolutely NO markdown
-- NO asterisks (**bold**), NO hashtags (#), NO bullet points (-), NO numbered lists
-- NO URLs or links in text
-- Conversational and warm tone
-
-SECTION 2 — PRODUCT CARDS (comes after text, one per line):
-- For EVERY product you mention or recommend, output this EXACT format on its own line:
-PRODUCT_CARD:{"title":"exact title","price":exact_number,"slug":"exact-slug","stock":exact_number}
-- Copy title/price/slug/stock EXACTLY from the database — do NOT alter anything
-- Do NOT add image field — it is handled separately
+- Customers regularly send messages in quick, short, single-word or short-phrase bursts sequentially.
+- You MUST analyze the entire CONVERSATION BACKGROUND ARCHIVE to link these broken messages together.
+- Match their dialect: Bangla inputs get standard Bangla responses, English inputs get technical English, and mixed inputs (Banglish phrasing) must get natural, fluid tech-focused Banglish responses.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STRICT BUSINESS RULES:
+BUSINESS OPERATIONS & UTILITY PROCEDURES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. ONLY recommend products from the database above — never invent products
-2. NEVER recommend a product with stock = 0 unless user specifically asks about it
-3. If user asks about an out-of-stock product, mention it clearly and suggest alternatives
-4. If a product the user asks about is NOT in our database, say: "এই পণ্যটি আমাদের স্টোরে এখন নেই।" (or English equivalent)
-5. If question is completely unrelated to tech/products, say: "আমি শুধু TechHub এর tech পণ্য নিয়ে সাহায্য করতে পারি।"
-6. For budget questions — suggest products within or closest to the budget
-7. For comparisons — be honest about pros and cons of each product
+- **Order Process / Purchase Method:** If asked how to buy or order, explain clearly: "Add your preferred hardware to the cart, click checkout, provide your shipping details, and select either Cash on Delivery or digital payment."
+- **Top Selling / Best Products:** If asked for top selling, trending, popular, or best items, scan your active LIVE SYSTEM HARDWARE DATABASE, select 1 to 2 high-demand items that have healthy stock levels, and present them as our top architectural choices.
+- **Greetings:** If the current message is a simple greeting (like "hello", "hi", "bro", "vai", "how are you"), do NOT output any PRODUCT_CARD components. Respond warmly.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CORRECT OUTPUT EXAMPLES:
+RESPONSE STRUCTURING LAWS — CRITICAL COMPLIANCE REQUIRED:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your absolute output response layout MUST strictly follow this exact split distribution pattern:
 
-Example 1 (Bangla, single product):
-আপনার বাজেটের মধ্যে ASUS VivoBook i5 সবচেয়ে ভালো অপশন। এতে 8GB RAM এবং 512GB SSD আছে, এবং এখন 15টি স্টকে আছে।
-PRODUCT_CARD:{"title":"ASUS VivoBook 15 Core i5 12th Gen","price":72000,"slug":"asus-vivobook-15-core-i5-12th-gen","stock":15}
+SECTION 1 — TEXT FIELD DESIGN (Must always occupy the absolute top block):
+- Strict limit of 2 to 3 compact, impactful sentences maximum.
+- Plain text strings ONLY. Do not use ANY markdown syntax.
+- **CRITICAL:** Do NOT write the words "no image", "no-image", "IMAGE_REF", or any technical metadata/layout remarks inside this section.
+- BANNED CHARACTERS: Absolutely NO asterisks (**), NO hashes (#), NO hyphens/bullets (-) for list formats, NO custom formatting styles.
+- Zero URL pathways or explicit web endpoints allowed inside this text block.
 
-Example 2 (English, multiple products):
-Here are the phones we have in stock right now. The iPhone 15 is our premium option, while the Samsung A55 offers great value.
-PRODUCT_CARD:{"title":"iPhone 15 128GB","price":130000,"slug":"iphone-15-128gb","stock":12}
-PRODUCT_CARD:{"title":"Samsung Galaxy A55 5G 8/256GB","price":52000,"slug":"samsung-galaxy-a55-5g-8-256gb","stock":22}
-
-Example 3 (out of stock):
-দুঃখিত, এই পণ্যটি বর্তমানে স্টকে নেই। তবে এই বিকল্পটি দেখতে পারেন।
-PRODUCT_CARD:{"title":"ASUS VivoBook 15 Core i5 12th Gen","price":72000,"slug":"asus-vivobook-15-core-i5-12th-gen","stock":15}
+SECTION 2 — PRODUCT META OBJECTS (Appended below text segment, single line instances):
+- ONLY output product cards if specific products from the database are actively being discussed, recommended, or selected. If answering general store policies or greetings, omit this section completely.
+- For each item highlighted, emit its structural string on its own individual line:
+PRODUCT_CARD:{"title":"exact title from db","price":exact_numerical_price,"slug":"exact-slug","stock":exact_numerical_stock,"image":"IMAGE_REF_X"}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CUSTOMER MESSAGE: "${userMessage}"
+STRICT OPERATIONAL RULES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Zero hallucination tolerance. Never reference an external inventory unit or item that isn't defined inside the active hardware profile database.
+2. Filter out-of-stock items automatically unless the specific model is targeted in context by name.
+3. If a selected variant is non-existent within the inventory structure, output: "এই পণ্যটি আমাদের স্টোরে এখন নেই।" (or English equivalent).
+4. Deflect any query that drops entirely out of technical systems or store equipment scope by executing: "আমি শুধু TechHub এর tech পণ্য নিয়ে সাহায্য করতে পারি।"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CORRECT SPECIMEN OUTPUT PATTERNS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+আপনার বাজেটের জন্য ASUS VivoBook i5 সবচেয়ে সুষম হবে। এর 12th Gen আর্কিটেকচার থার্মাল থ্রটলিং ছাড়াই আপনার ডেইলি টাস্ক ম্যানেজ করবে এবং বর্তমানে ১৫টি ইউনিট স্টকে আছে।
+PRODUCT_CARD:{"title":"ASUS VivoBook 15 Core i5 12th Gen","price":72000,"slug":"asus-vivobook-15-core-i5-12th-gen","stock":15,"image":"IMAGE_REF_1"}
+
+CUSTOMER CURRENT MESSAGE: "${userMessage}"
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text =
-      result?.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-      "";
+    let result;
+    try {
+      result = await primaryModel.generateContent(prompt);
+    } catch (err) {
+      if (err.message.includes("503") || err.message.includes("demand")) {
+        console.warn("Primary chat model under heavy load. Executing backup model route execution...");
+        result = await backupModel.generateContent(prompt);
+      } else {
+        throw err;
+      }
+    }
+
+    let text = result?.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+    // Post-Processing Interceptor Engine to swap references back to safe URLs
+    Object.keys(imageMap).forEach((key) => {
+      if (text.includes(key)) {
+        text = text.split(key).join(imageMap[key]);
+      }
+    });
+
+    // Final safety interceptor to strip out accidental text remnants from AI
+    text = text.replace(/no\s*image/gi, "").replace(/image_ref_\d+/gi, "").trim();
+
     return text;
   } catch (error) {
     console.error("Gemini Chat Error:", error.message);
