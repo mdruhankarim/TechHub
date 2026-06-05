@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Mail, Lock, User, Shield } from "lucide-react";
 import registerImage from "@/assets/register.png";
+import { Link } from "react-router-dom";
 
 const SignupForm = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +28,6 @@ const SignupForm = () => {
   const onSubmit = (data) => {
     const { confirmPassword, terms, ...rest } = data;
     console.log("Signup data:", rest);
-    alert(`Account created!\nName: ${data.fullName}\nEmail: ${data.email}`);
   };
 
   return (
@@ -202,19 +202,19 @@ const SignupForm = () => {
                   className="text-sm font-normal leading-relaxed cursor-pointer"
                 >
                   I agree to the{" "}
-                  <a
-                    href="#"
+                  <Link
+                    to={"/"}
                     className="font-semibold text-red-500 hover:underline underline-offset-4"
                   >
                     Terms &amp; Conditions
-                  </a>{" "}
+                  </Link>{" "}
                   and{" "}
-                  <a
-                    href="#"
+                  <Link
+                    to={"/"}
                     className="font-semibold text-red-500 hover:underline underline-offset-4"
                   >
                     Privacy Policy
-                  </a>
+                  </Link>
                 </Label>
               </div>
               {errors.terms && (
@@ -296,12 +296,12 @@ const SignupForm = () => {
             {/* Sign in link */}
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <a
-                href="/login"
+              <Link
+                to={"/login"}
                 className="font-semibold text-red-500 hover:underline underline-offset-4"
               >
                 Sign in
-              </a>
+              </Link>
             </p>
           </form>
 
@@ -331,13 +331,19 @@ const SignupForm = () => {
       {/* Bottom note */}
       <p className="text-center text-xs text-muted-foreground px-6">
         By clicking continue, you agree to our{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-black">
+        <Link
+          to={"/"}
+          className="underline underline-offset-4 hover:text-black"
+        >
           Terms of Service
-        </a>{" "}
+        </Link>{" "}
         and{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-black">
+        <Link
+          to={"/"}
+          className="underline underline-offset-4 hover:text-black"
+        >
           Privacy Policy
-        </a>
+        </Link>
         .
       </p>
     </div>

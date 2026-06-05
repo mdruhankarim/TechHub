@@ -8,12 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Mail, Lock, Shield } from "lucide-react";
-import { Link } from "react-router-dom";
-
+import { Link, useNavigate } from "react-router-dom";
 import login from "@/assets/login.png";
+import { useLoginUser } from "@/hooks/user.query";
+import { AuthToast } from "./common/AuthToast";
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const { mutate, isPending, error } = useLoginUser();
+  const navigate = useNavigate();
 
   const {
     register,
@@ -22,10 +25,21 @@ const LoginForm = () => {
   } = useForm();
 
   const onSubmit = (data) => {
-    console.log("Login data:", data);
-    // alert(`Login submitted!\nEmail: ${data.email}`)
-  };
+    mutate(data, {
+      onSuccess: (response) => {
+        // console.log(response);
+        AuthToast.success(response?.message || "User Login Successfully");
 
+        if (response?.statusCode === 200) {
+          navigate("/");
+        }
+      },
+
+      onError: (err) => {
+        console.log(err);
+      },
+    });
+  };
   return (
     <div className={cn("flex flex-col gap-6")}>
       <Card className="overflow-hidden p-0 shadow-xl border border-gray-200">
@@ -244,13 +258,19 @@ const LoginForm = () => {
       {/* Bottom note */}
       <p className="text-center text-xs text-muted-foreground px-6">
         By clicking continue, you agree to our{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-black">
+        <Link
+          to={"/"}
+          className="underline underline-offset-4 hover:text-black"
+        >
           Terms of Service
-        </a>{" "}
+        </Link>{" "}
         and{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-black">
+        <Link
+          to={"/"}
+          className="underline underline-offset-4 hover:text-black"
+        >
           Privacy Policy
-        </a>
+        </Link>
         .
       </p>
     </div>
