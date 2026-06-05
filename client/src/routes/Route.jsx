@@ -6,6 +6,7 @@ import App from "@/App";
 import Home from "@/pages/Home";
 import Login from "@/pages/Auth/Login";
 import Register from "@/pages/Auth/Register";
+import { ProtectedRoutes } from "./ProtectedRoutes";
 
 // import DashboardLayout from "@/layouts/Dashboardlayout";
 
@@ -41,7 +42,7 @@ const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      { index: true, element: <Home /> },
+      { index: true, element: <ProtectedRoutes><Home /></ProtectedRoutes> },
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
 
