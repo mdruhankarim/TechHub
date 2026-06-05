@@ -36,6 +36,9 @@ const LoginForm = () => {
       },
 
       onError: (err) => {
+        AuthToast.error(
+          err?.response?.data?.message || "Invalid email or password",
+        );
         console.log(err);
       },
     });

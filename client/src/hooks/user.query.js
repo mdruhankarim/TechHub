@@ -1,5 +1,5 @@
-import { loginUser, registerUser } from "@/api/user.api";
-import { useMutation } from "@tanstack/react-query";
+import { getUser, loginUser, registerUser } from "@/api/user.api";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 export const useRegisterUser = () => {
   return useMutation({
@@ -10,5 +10,18 @@ export const useRegisterUser = () => {
 export const useLoginUser = () => {
   return useMutation({
     mutationFn: loginUser,
+  });
+};
+
+export const useUpdateProfile = () => {
+  return useMutation({});
+};
+
+export const useGetProfile = (enabled = true) => {
+  return useQuery({
+    queryFn: getUser,
+    enabled,
+    queryKey: ["getUser"],
+    retry: false,
   });
 };
