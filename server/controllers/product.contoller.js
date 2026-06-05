@@ -129,3 +129,33 @@ export const getFeaturedProductConroller = asyncHandler(async (req, res) => {
       ),
     );
 });
+
+// getSingleProductController
+export const getSingleProductController = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+
+  if (!slug) {
+    throw new ApiError(400, "Product slug is required");
+  }
+
+  const cacheKey = `product:${slug}`;
+
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    return res.status(200).json(
+      new ApiResponse(200, { product: cached }, "Product fetched successfully")
+    );
+  }
+
+  const product = await Product.findOne({ slug, isPublished: true, isArchived: false }).lean();
+
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  await redis.set(cacheKey, product, { ex: 3600 });
+
+  return res.status(200).json(
+    new ApiResponse(200, { product }, "Product fetched successfully")
+  );
+});
