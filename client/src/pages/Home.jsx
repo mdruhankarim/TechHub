@@ -1,11 +1,10 @@
-import CreateProductPage from "./Dashboard/AddProduct";
-import UpdateProductPage from "./Dashboard/Updateproductpage";
+import HomeCategories from "@/components/HomeCategories";
+
 
 const Home = () => {
   return (
-    <div className="">
-      {/* <CreateProductPage /> */}
-      {/* <UpdateProductPage/> */}
+    <div className="min-h-screen bg-gray-100">
+      <HomeCategories />
     </div>
   );
 };

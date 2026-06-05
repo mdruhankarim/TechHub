@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 export const ProtectedRoutes = ({ children }) => {
   const setUser = useUserStore((state) => state.setUser);
   const { data, isLoading, isError } = useGetProfile();
-  console.log(data);
+  // console.log(data);
 
   useEffect(() => {
     if (data?.user) {
