@@ -1,7 +1,7 @@
-import { getProducsts } from "@/api/product.api";
+import { getCategories, getProducsts } from "@/api/product.api";
 import { useQuery } from "@tanstack/react-query";
 
-export function useProducts(filters = {}) {
+export const useProducts = (filters = {}) => {
   return useQuery({
     queryKey: ["products", filters],
     queryFn: () => getProducsts(filters),
@@ -9,4 +9,12 @@ export function useProducts(filters = {}) {
     gcTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
-}
+};
+
+export const useGetCategories = () => {
+  return useQuery({
+    queryKey: ["categories"],
+    queryFn: getCategories,
+    staleTime: 15 * 60 * 1000,
+  });
+};

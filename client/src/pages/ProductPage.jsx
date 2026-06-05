@@ -15,6 +15,9 @@ import {
   SheetTrigger
 } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useGetCategories } from "@/hooks/useProducts";
+
+
 
 // Reusable item skeleton block to match your sidebar layouts
 const FilterItemSkeleton = ({ count = 5 }) => (
@@ -28,8 +31,17 @@ const FilterItemSkeleton = ({ count = 5 }) => (
   </div>
 );
 
-const FilterSidebar = ({ categories, brands, isInitialLoading }) => {
+const FilterSidebar = ({ brands = [], isInitialLoading }) => {
+  // 1. Get the data straight from your hook
+  const { data: apiResponse, isLoading: isCategoriesLoading } = useGetCategories();
+
+  // 2. Extract the array based on your exact console log structure
+  const categories = apiResponse?.data?.categories || [];
+
   const [priceRange, setPriceRange] = useState([0, 1000]);
+
+  // Combined loading state for skeletons
+  const showCategoriesSkeleton = isCategoriesLoading || isInitialLoading;
 
   return (
     <div className="space-y-6">
@@ -45,17 +57,18 @@ const FilterSidebar = ({ categories, brands, isInitialLoading }) => {
             Categories
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-4 space-y-3">
-            {categories.length === 0 ? (
+            {showCategoriesSkeleton ? (
               <FilterItemSkeleton count={5} />
             ) : (
+              // 3. Map over the objects using ._id and .name
               categories.map((category) => (
-                <div key={category} className="flex items-center space-x-3">
-                  <Checkbox id={`cat-${category}`} />
+                <div key={category._id} className="flex items-center space-x-3">
+                  <Checkbox id={`cat-${category._id}`} />
                   <label
-                    htmlFor={`cat-${category}`}
+                    htmlFor={`cat-${category._id}`}
                     className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                   >
-                    {category}
+                    {category.name}
                   </label>
                 </div>
               ))
@@ -137,7 +150,6 @@ const FilterSidebar = ({ categories, brands, isInitialLoading }) => {
     </div>
   );
 };
-
 const ProductPage = () => {
   // Pure JS state variables initialization
   const [categoriesData, setCategoriesData] = useState([]);
