@@ -8,11 +8,15 @@ import generateAccessToken from "../utils/generateAccessToken.js";
 import generateRefreshToken from "../utils/generateRefreshToken.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { ApiError } from "../utils/ApiError.js";
 import generateOTP from "../utils/generateOTP.js";
 import verifyOtpTemplate from "../utils/verifyOtpTemplate.js";
 import jwt from "jsonwebtoken";
+import userService from "../services/userService.js";
 
 dotenv.config();
 
@@ -29,46 +33,24 @@ export const registerUserController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Name, email and password are required");
   }
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new ApiError(400, "Email already registered. Please login.");
+  try {
+    await userService.register({ name, email, password });
+
+    return res
+      .status(201)
+      .json(
+        new ApiResponse(
+          201,
+          null,
+          "User registered successfully. Please check your email to verify.",
+        ),
+      );
+  } catch (error) {
+    if (error.message === "EMAIL_ALREADY_EXISTS") {
+      throw new ApiError(400, "Email already registered. Please login.");
+    }
+    throw new ApiError(500, error.message);
   }
-
-  const salt = await bcryptjs.genSalt(12);
-  const hashedPassword = await bcryptjs.hash(password, salt);
-
-  const emailVerifyToken = crypto.randomBytes(32).toString("hex");
-
-  const newUser = new User({
-    name,
-    email,
-    password: hashedPassword,
-    email_verify_token: emailVerifyToken,
-    email_verify_expiry: Date.now() + 3600000,
-  });
-
-  await newUser.save();
-
-  const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?token=${emailVerifyToken}`;
-
-  await sendEmail({
-    sendTo: email,
-    subject: "Verify your email - GroStore",
-    html: verifyEmailTemplate({
-      name,
-      url: verifyEmailUrl,
-    }),
-  });
-
-  return res
-    .status(201)
-    .json(
-      new ApiResponse(
-        201,
-        null,
-        "User registered successfully. Please check your email to verify.",
-      ),
-    );
 });
 
 /**
@@ -191,13 +173,9 @@ export const userDetailsController = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(404, "User not found");
   }
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      { user },
-      "User details fetched successfully",
-    ),
-  );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { user }, "User details fetched successfully"));
 });
 
 /**
@@ -364,49 +342,54 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
  * @route   POST /api/v1/users/verify-otp
  * @access  Public
  */
-export const verifyForgotPasswordOtpController = asyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
+export const verifyForgotPasswordOtpController = asyncHandler(
+  async (req, res) => {
+    const { email, otp } = req.body;
 
-  if (!email || !otp) {
-    throw new ApiError(400, "Email and otp are required");
-  }
+    if (!email || !otp) {
+      throw new ApiError(400, "Email and otp are required");
+    }
 
-  const user = await User.findOne({ email }).select(
-    "+forgot_password_otp +forgot_password_expiry",
-  );
-
-  if (!user) {
-    throw new ApiError(400, "User not found");
-  }
-
-  if (!user.forgot_password_expiry || user.forgot_password_expiry < Date.now()) {
-    throw new ApiError(400, "OTP expired. Please request a new one.");
-  }
-
-  const hashedOtp = crypto
-    .createHash("sha256")
-    .update(otp.toString())
-    .digest("hex");
-
-  if (hashedOtp !== user.forgot_password_otp) {
-    throw new ApiError(400, "Invalid OTP");
-  }
-
-  await User.findByIdAndUpdate(user?._id, {
-    forgot_password_otp: "",
-    forgot_password_expiry: "",
-  });
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        null,
-        "OTP verified successfully. You can now reset your password.",
-      ),
+    const user = await User.findOne({ email }).select(
+      "+forgot_password_otp +forgot_password_expiry",
     );
-});
+
+    if (!user) {
+      throw new ApiError(400, "User not found");
+    }
+
+    if (
+      !user.forgot_password_expiry ||
+      user.forgot_password_expiry < Date.now()
+    ) {
+      throw new ApiError(400, "OTP expired. Please request a new one.");
+    }
+
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp.toString())
+      .digest("hex");
+
+    if (hashedOtp !== user.forgot_password_otp) {
+      throw new ApiError(400, "Invalid OTP");
+    }
+
+    await User.findByIdAndUpdate(user?._id, {
+      forgot_password_otp: "",
+      forgot_password_expiry: "",
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          null,
+          "OTP verified successfully. You can now reset your password.",
+        ),
+      );
+  },
+);
 
 /**
  * @desc    Overwrite existing password credentials using verified multi-stage validation checks
@@ -439,7 +422,10 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User not found");
   }
 
-  if (!user.forgot_password_expiry || user.forgot_password_expiry < Date.now()) {
+  if (
+    !user.forgot_password_expiry ||
+    user.forgot_password_expiry < Date.now()
+  ) {
     throw new ApiError(400, "OTP expired");
   }
 

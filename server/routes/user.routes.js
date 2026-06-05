@@ -22,7 +22,7 @@ const userRouter = Router();
 /**
  * AUTH ROUTES
  */
-userRouter.post("/register", otpRateLimiter, registerUserController);
+userRouter.post("/register", registerUserController);
 userRouter.post("/verify-email", otpRateLimiter, verifyEmailController);
 userRouter.post("/login", loginUserController);
 userRouter.post("/refresh-token", refreshTokenController);
