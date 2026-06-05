@@ -20,6 +20,13 @@ import userService from "../services/userService.js";
 
 dotenv.config();
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  path: "/",
+};
+
 /**
  * @desc    Register a new user and dispatch a secure verification token link via email
  * @route   POST /api/v1/users/register
@@ -99,62 +106,36 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
 export const loginUserController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    throw new ApiError(400, "Email and password are required");
-  }
+  if (!email || !password)
+    throw new ApiError("Email and password are required");
 
-  const user = await User.findOne({ email }).select("+password");
+  try {
+    const { user, accessToken, refreshToken } = await userService.login({
+      email,
+      password,
+    });
 
-  if (!user) {
+    res.cookie("accessToken", accessToken, {
+      ...cookieOptions,
+      maxAge: 5 * 60 * 60 * 1000,
+    });
+    res.cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, { user, accessToken }, "Login successful"));
+  } catch (error) {
+    if (error.message === "ACCOUNT_INACTIVE") {
+      throw new ApiError(
+        403,
+        "Your account is inactive. Please contact admin.",
+      );
+    }
     throw new ApiError(400, "Invalid email or password");
   }
-
-  if (user.status !== "Active") {
-    throw new ApiError(403, "Your account is not active. Contact admin.");
-  }
-
-  const isPasswordValid = await bcryptjs.compare(password, user.password);
-  if (!isPasswordValid) {
-    throw new ApiError(400, "Invalid email or password");
-  }
-
-  const accessToken = generateAccessToken(user);
-  const refreshToken = await generateRefreshToken(user._id);
-
-  await User.findByIdAndUpdate(user._id, {
-    last_login_date: new Date(),
-  });
-
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    path: "/",
-  };
-
-  res.cookie("accessToken", accessToken, {
-    ...cookieOptions,
-    maxAge: 5 * 60 * 60 * 1000,
-  });
-
-  res.cookie("refreshToken", refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        user: {
-          name: user.name,
-          email: user.email,
-        },
-        accessToken,
-      },
-      "Login successful",
-    ),
-  );
 });
 
 /**
