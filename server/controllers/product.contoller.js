@@ -126,17 +126,29 @@ export const getProductController = asyncHandler(async (req, res) => {
  */
 export const getFeaturedProductConroller = asyncHandler(async (req, res) => {
   const cached = await redis.get("featured_products");
+
   if (cached) {
-    const products = JSON.parse(cached);
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { products, total: products.length },
-          "Featured products fetched successfully",
-        ),
+    let parsedData = null;
+
+    if (typeof cached === "object" && cached !== null) {
+      parsedData = cached;
+    } else if (typeof cached === "string") {
+      try {
+        if (cached !== "[object Object]") {
+          parsedData = JSON.parse(cached);
+        } else {
+          await redis.del("featured_products");
+        }
+      } catch (e) {
+        await redis.del("featured_products");
+      }
+    }
+
+    if (parsedData) {
+      return res.status(200).json(
+        new ApiResponse(200, { products: parsedData, total: parsedData.length }, "Featured products fetched successfully")
       );
+    }
   }
 
   const featuredProducts = await Product.find({ isFeatured: true }).lean();
@@ -144,21 +156,12 @@ export const getFeaturedProductConroller = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No featured products found");
   }
 
-  await redis.set("featured_products", JSON.stringify(featuredProducts), {
-    ex: 600,
-  });
+  await redis.set("featured_products", JSON.stringify(featuredProducts), { ex: 600 });
 
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { products: featuredProducts, total: featuredProducts.length },
-        "Featured products fetched successfully",
-      ),
-    );
+  return res.status(200).json(
+    new ApiResponse(200, { products: featuredProducts, total: featuredProducts.length }, "Featured products fetched successfully")
+  );
 });
-
 /**
  * @desc    Get single product details by unique slug identification
  * @route   GET /api/v1/products/:slug

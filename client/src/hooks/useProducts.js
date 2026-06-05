@@ -1,4 +1,8 @@
-import { getCategories, getProducsts } from "@/api/product.api";
+import {
+  getCategories,
+  getFeaturedProducts,
+  getProducsts,
+} from "@/api/product.api";
 import { useQuery } from "@tanstack/react-query";
 
 export const useProducts = (filters = {}) => {
@@ -16,5 +20,13 @@ export const useGetCategories = () => {
     queryKey: ["categories"],
     queryFn: getCategories,
     staleTime: 15 * 60 * 1000,
+  });
+};
+
+export const useFeaturedProducts = () => {
+  return useQuery({
+    queryKey: ["featuredProducts"],
+    queryFn: getFeaturedProducts,
+    staleTime: 1000 * 60 * 5,
   });
 };

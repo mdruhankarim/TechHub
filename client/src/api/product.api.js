@@ -9,3 +9,8 @@ export const getCategories = async () => {
   const res = await api.get("/products/categories");
   return res.data;
 };
+
+export const getFeaturedProducts = async () => {
+  const res = await api.get("/products/featured");
+  return res.data;
+};

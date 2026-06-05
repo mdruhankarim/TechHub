@@ -5,7 +5,10 @@ import User from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  deleteFromCloudinary,
+  uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import { detectProductCategory } from "../utils/gemini.js";
 
 /**
@@ -332,24 +335,49 @@ export const updateCategoryController = asyncHandler(async (req, res) => {
  */
 export const getAllCategoryController = asyncHandler(async (req, res) => {
   const cached = await redis.get("all_categories");
+
   if (cached) {
-    const categories = JSON.parse(cached);
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          { totalCategories: categories.length, categories },
-          "Categories fetched successfully",
-        ),
-      );
+    let parsedData = null;
+
+    // 1. If it's already a parsed object, use it directly
+    if (typeof cached === "object" && cached !== null) {
+      parsedData = cached;
+    }
+    // 2. If it's a string, safely attempt to parse it
+    else if (typeof cached === "string") {
+      try {
+        if (cached !== "[object Object]") {
+          parsedData = JSON.parse(cached);
+        } else {
+          // Self-heal: Delete the corrupted string from Redis
+          await redis.del("all_categories");
+        }
+      } catch (e) {
+        await redis.del("all_categories");
+      }
+    }
+
+    // If parsing was successful, return the data
+    if (parsedData) {
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            { totalCategories: parsedData.length, categories: parsedData },
+            "Categories fetched successfully",
+          ),
+        );
+    }
   }
 
+  // Database fallback
   const categories = await Category.find();
   if (!categories || categories.length === 0) {
     throw new ApiError(404, "No categories found");
   }
 
+  // Store properly as a stringified JSON
   await redis.set("all_categories", JSON.stringify(categories), { ex: 3600 });
 
   return res
