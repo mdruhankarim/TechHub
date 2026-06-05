@@ -67,34 +67,16 @@ export const registerUserController = asyncHandler(async (req, res) => {
  */
 export const verifyEmailController = asyncHandler(async (req, res) => {
   const token = req.query.token || req.body.token;
+  if (!token) throw new ApiError(400, "Verification token is missing");
 
-  if (!token) {
-    throw new ApiError(400, "Verification token is missing");
-  }
-
-  const user = await User.findOne({
-    email_verify_token: token,
-    email_verify_expiry: { $gt: Date.now() },
-  });
-
-  if (!user) {
+  try {
+    await userService.verifyEmail(token);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "Email verified successfully!"));
+  } catch (error) {
     throw new ApiError(400, "Invalid or expired verification link");
   }
-
-  user.verify_email = true;
-  user.email_verify_token = null;
-  user.email_verify_expiry = null;
-  await user.save();
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        null,
-        "Email verified successfully! You can now login.",
-      ),
-    );
 });
 
 /**
@@ -145,18 +127,18 @@ export const loginUserController = asyncHandler(async (req, res) => {
  */
 export const userDetailsController = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
+  if (!userId) throw new ApiError(400, "Unauthorized Access");
 
-  if (!userId) {
-    throw new ApiError(400, "Unauthorized Access");
+  try {
+    const user = await userService.getUserDetails(userId);
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, { user }, "User details fetched successfully"),
+      );
+  } catch (error) {
+    throw new ApiError(404, error.message);
   }
-  const user = await User.findById(userId).select("-password -refresh_token");
-
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-  return res
-    .status(200)
-    .json(new ApiResponse(200, { user }, "User details fetched successfully"));
 });
 
 /**
@@ -165,24 +147,11 @@ export const userDetailsController = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const logoutUserController = asyncHandler(async (req, res) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    path: "/",
-  };
-
   const refreshToken = req.cookies?.refreshToken;
+  await userService.logout(refreshToken);
 
   res.clearCookie("accessToken", cookieOptions);
   res.clearCookie("refreshToken", cookieOptions);
-
-  if (refreshToken) {
-    await User.updateOne(
-      { refresh_token: refreshToken },
-      { refresh_token: null },
-    );
-  }
 
   return res
     .status(200)
@@ -240,40 +209,29 @@ export const updateAvatarController = asyncHandler(async (req, res) => {
  * @access  Private
  */
 export const updateUserDetailsController = asyncHandler(async (req, res) => {
-  const user = req.user;
-  if (!user) {
-    throw new ApiError(401, "Unauthorized - Please login first");
-  }
-
+  if (!req.user) throw new ApiError(401, "Unauthorized - Please login first");
   const { name, mobile } = req.body;
 
-  if (!name && !mobile) {
+  if (!name && !mobile)
     throw new ApiError(400, "At least one field is required to update");
-  }
-
-  if (name && name.trim().length < 2) {
+  if (name && name.trim().length < 2)
     throw new ApiError(400, "Name must be at least 2 characters long");
-  }
-
-  if (mobile && !/^[0-9]{10,15}$/.test(mobile)) {
+  if (mobile && !/^[0-9]{10,15}$/.test(mobile))
     throw new ApiError(400, "Invalid mobile number");
-  }
 
-  if (name) user.name = name.trim();
-  if (mobile) user.mobile = mobile;
-
-  await user.save({ validateBeforeSave: false });
-
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        name: user.name,
-        mobile: user.mobile,
-      },
-      "User details updated successfully",
-    ),
-  );
+  const updatedUser = await userService.updateProfile(req.user, {
+    name,
+    mobile,
+  });
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { name: updatedUser.name, mobile: updatedUser.mobile },
+        "Profile updated",
+      ),
+    );
 });
 
 /**
@@ -283,39 +241,16 @@ export const updateUserDetailsController = asyncHandler(async (req, res) => {
  */
 export const forgotPasswordController = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  if (!email) throw new ApiError(400, "Email is required");
 
-  if (!email) {
-    throw new ApiError(400, "Email is required");
-  }
-
-  const user = await User.findOne({ email });
-  if (!user) {
+  try {
+    await userService.forgotPassword(email);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "OTP sent to your email"));
+  } catch (error) {
     throw new ApiError(400, "User not available");
   }
-
-  const otp = generateOTP();
-  const hashedOtp = crypto
-    .createHash("sha256")
-    .update(otp.toString())
-    .digest("hex");
-
-  user.forgot_password_otp = hashedOtp;
-  user.forgot_password_expiry = Date.now() + 60 * 60 * 1000;
-
-  await user.save({ validateBeforeSave: false });
-
-  await sendEmail({
-    sendTo: user?.email,
-    subject: "Your Password Reset OTP - GroStore",
-    html: verifyOtpTemplate({
-      name: user?.name,
-      otp,
-    }),
-  });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, null, "OTP sent to your email"));
 });
 
 /**
@@ -323,54 +258,17 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
  * @route   POST /api/v1/users/verify-otp
  * @access  Public
  */
-export const verifyForgotPasswordOtpController = asyncHandler(
-  async (req, res) => {
-    const { email, otp } = req.body;
+export const verifyForgotPasswordOtpController = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) throw new ApiError(400, "Email and otp are required");
 
-    if (!email || !otp) {
-      throw new ApiError(400, "Email and otp are required");
-    }
-
-    const user = await User.findOne({ email }).select(
-      "+forgot_password_otp +forgot_password_expiry",
-    );
-
-    if (!user) {
-      throw new ApiError(400, "User not found");
-    }
-
-    if (
-      !user.forgot_password_expiry ||
-      user.forgot_password_expiry < Date.now()
-    ) {
-      throw new ApiError(400, "OTP expired. Please request a new one.");
-    }
-
-    const hashedOtp = crypto
-      .createHash("sha256")
-      .update(otp.toString())
-      .digest("hex");
-
-    if (hashedOtp !== user.forgot_password_otp) {
-      throw new ApiError(400, "Invalid OTP");
-    }
-
-    await User.findByIdAndUpdate(user?._id, {
-      forgot_password_otp: "",
-      forgot_password_expiry: "",
-    });
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          null,
-          "OTP verified successfully. You can now reset your password.",
-        ),
-      );
-  },
-);
+  try {
+    await userService.verifyOtp({ email, otp });
+    return res.status(200).json(new ApiResponse(200, null, "OTP verified successfully. Proceed to reset."));
+  } catch (error) {
+    throw new ApiError(400, error.message === "OTP_EXPIRED" ? "OTP expired." : "Invalid OTP");
+  }
+});
 
 /**
  * @desc    Overwrite existing password credentials using verified multi-stage validation checks
@@ -379,58 +277,20 @@ export const verifyForgotPasswordOtpController = asyncHandler(
  */
 export const resetPasswordController = asyncHandler(async (req, res) => {
   const { email, otp, newPassword, confirmPassword } = req.body;
-
   if (!email || !otp || !newPassword || !confirmPassword) {
-    throw new ApiError(
-      400,
-      "Email, OTP, new password and confirm password are required",
-    );
+    throw new ApiError(400, "All parameters are required");
   }
+  if (newPassword !== confirmPassword) throw new ApiError(400, "Passwords do not match");
+  if (newPassword.length < 8) throw new ApiError(400, "Password must be at least 8 characters long");
 
-  if (newPassword !== confirmPassword) {
-    throw new ApiError(400, "Password and confirm password do not match");
+  try {
+    await userService.resetPassword({ email, otp, newPassword });
+    return res.status(200).json(new ApiResponse(200, null, "Password reset successfully"));
+  } catch (error) {
+    throw new ApiError(400, error.message);
   }
-
-  if (newPassword.length < 8) {
-    throw new ApiError(400, "Password must be at least 8 characters long");
-  }
-
-  const user = await User.findOne({ email }).select(
-    "+forgot_password_otp +forgot_password_expiry +password",
-  );
-
-  if (!user) {
-    throw new ApiError(400, "User not found");
-  }
-
-  if (
-    !user.forgot_password_expiry ||
-    user.forgot_password_expiry < Date.now()
-  ) {
-    throw new ApiError(400, "OTP expired");
-  }
-
-  const hashedOtp = crypto
-    .createHash("sha256")
-    .update(otp.toString())
-    .digest("hex");
-
-  if (hashedOtp !== user.forgot_password_otp) {
-    throw new ApiError(400, "Invalid OTP");
-  }
-
-  const salt = await bcryptjs.genSalt(12);
-  user.password = await bcryptjs.hash(newPassword, salt);
-
-  user.forgot_password_otp = null;
-  user.forgot_password_expiry = null;
-
-  await user.save({ validateBeforeSave: false });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, null, "Password reset successfully"));
 });
+
 
 /**
  * @desc    Validate active refresh JSON web tokens and issue rotational access tokens
@@ -439,55 +299,14 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
  * @note    FUTURE: Implement token reuse detection (Automatic family revocation) to protect compromised refresh keys.
  */
 export const refreshTokenController = asyncHandler(async (req, res) => {
-  const refreshToken =
-    req?.cookies?.refreshToken ||
-    req.header("Authorization")?.replace("Bearer ", "");
+  const refreshToken = req?.cookies?.refreshToken || req.header("Authorization")?.replace("Bearer ", "");
+  if (!refreshToken) throw new ApiError(401, "Refresh token is missing");
 
-  if (!refreshToken) {
-    throw new ApiError(401, "Refresh token is missing");
-  }
-
-  let decode;
   try {
-    decode = jwt.verify(refreshToken, process.env.SECRET_KEY_REFRESHTOKEN);
+    const newAccessToken = await userService.refreshSession(refreshToken);
+    res.cookie("accessToken", newAccessToken, { ...cookieOptions, maxAge: 5 * 60 * 60 * 1000 });
+    return res.status(200).json(new ApiResponse(200, { accessToken: newAccessToken }, "Token rotated"));
   } catch (error) {
-    throw new ApiError(401, "Invalid or expired refresh token");
+    throw new ApiError(401, error.message);
   }
-
-  const user = await User.findById(decode?.id).select("+refresh_token");
-
-  if (!user) {
-    throw new ApiError(401, "User not found");
-  }
-
-  if (user.refresh_token !== refreshToken) {
-    throw new ApiError(401, "Refresh token mismatch");
-  }
-
-  if (!user.verify_email) {
-    throw new ApiError(403, "Email not verified");
-  }
-
-  const newAccessToken = generateAccessToken(user);
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    path: "/",
-  };
-
-  res.cookie("accessToken", newAccessToken, {
-    ...cookieOptions,
-    maxAge: 5 * 60 * 60 * 1000,
-  });
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        { accessToken: newAccessToken },
-        "Access token refreshed successfully",
-      ),
-    );
 });
