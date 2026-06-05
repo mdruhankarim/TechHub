@@ -148,7 +148,7 @@ export const loginUserController = asyncHandler(async (req, res) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     path: "/",
   };
 
@@ -173,8 +173,8 @@ export const loginUserController = asyncHandler(async (req, res) => {
         },
         accessToken,
       },
-      "Login successful"
-    )
+      "Login successful",
+    ),
   );
 });
 
@@ -207,7 +207,7 @@ export const logoutUserController = asyncHandler(async (req, res) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     path: "/",
   };
 
@@ -493,7 +493,7 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
     path: "/",
   };
 
