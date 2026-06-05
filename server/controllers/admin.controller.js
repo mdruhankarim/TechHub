@@ -5,13 +5,15 @@ import User from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
-import {
-  deleteFromCloudinary,
-  uploadOnCloudinary,
-} from "../utils/cloudinary.js";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { detectProductCategory } from "../utils/gemini.js";
 
-// getAllUserController
+/**
+ * @desc    Retrieve all system users with exclusions of critical infrastructure fields
+ * @route   GET /api/v1/admin/users
+ * @access  Private (Admin Only)
+ * @note    FUTURE: Implement cursor-based or offset pagination to mitigate high memory consumption on large datasets.
+ */
 export const getAllUserController = asyncHandler(async (req, res) => {
   const users = await User.find()
     .select(
@@ -34,7 +36,12 @@ export const getAllUserController = asyncHandler(async (req, res) => {
     );
 });
 
-// addProductController
+/**
+ * @desc    Generate a new product entry, process Cloudinary uploads, and flush operational cache layers
+ * @route   POST /api/v1/products
+ * @access  Private (Admin Only)
+ * @note    FUTURE: Implement a transaction wrapper (session) to roll back Cloudinary uploads if database insertion fails.
+ */
 export const addProductController = asyncHandler(async (req, res) => {
   if (req.user?.role !== "Admin") {
     throw new ApiError(403, "Access denied. Admin only.");
@@ -97,7 +104,11 @@ export const addProductController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, product, "Product added successfully"));
 });
 
-// updateProductController
+/**
+ * @desc    Modify existing product parameters, handle differential image synchronization, and purge cache
+ * @route   PUT /api/v1/products/:id
+ * @access  Private (Admin Only)
+ */
 export const updateProductController = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const {
@@ -169,7 +180,12 @@ export const updateProductController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, product, "Product updated successfully"));
 });
 
-// toggleFeaturedProduct
+/**
+ * @desc    Toggle targeted product visibility on high-priority landing metrics
+ * @route   PATCH /api/v1/products/:id/featured
+ * @access  Private (Admin Only)
+ * @note    FUTURE: Introduce a maximum threshold limit for featured items to retain optimal landing performance.
+ */
 export const toggleFeaturedProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -201,7 +217,11 @@ export const toggleFeaturedProduct = asyncHandler(async (req, res) => {
   );
 });
 
-// deleteProductController
+/**
+ * @desc    Purge physical asset associations from Cloudinary and eliminate database identity records
+ * @route   DELETE /api/v1/products/:id
+ * @access  Private (Admin Only)
+ */
 export const deleteProductController = asyncHandler(async (req, res) => {
   const productId = req.params.id;
 
@@ -226,7 +246,11 @@ export const deleteProductController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Product deleted successfully"));
 });
 
-// AddCategoryController
+/**
+ * @desc    Generate a new categorization resource with optimized storage paths
+ * @route   POST /api/v1/categories
+ * @access  Private (Admin Only)
+ */
 export const AddCategoryController = asyncHandler(async (req, res) => {
   const file = req.file;
   const { name } = req.body;
@@ -257,7 +281,11 @@ export const AddCategoryController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, newCategory, "Category added successfully"));
 });
 
-// updateCategoryController
+/**
+ * @desc    Update specialized configuration fields and sync old file lifecycle cleanups
+ * @route   PUT /api/v1/categories/:id
+ * @access  Private (Admin Only)
+ */
 export const updateCategoryController = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
@@ -296,7 +324,12 @@ export const updateCategoryController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, category, "Category updated successfully"));
 });
 
-// getAllCategoryController
+/**
+ * @desc    Fetch comprehensive category data utilizing low-latency Redis caching layers
+ * @route   GET /api/v1/categories
+ * @access  Public
+ * @note    FUTURE: Implement partial cache revalidation pipelines (stale-while-revalidate) instead of absolute TTL expirations.
+ */
 export const getAllCategoryController = asyncHandler(async (req, res) => {
   const cached = await redis.get("all_categories");
   if (cached) {

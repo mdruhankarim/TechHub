@@ -8,10 +8,7 @@ import generateAccessToken from "../utils/generateAccessToken.js";
 import generateRefreshToken from "../utils/generateRefreshToken.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import {
-  deleteFromCloudinary,
-  uploadOnCloudinary,
-} from "../utils/cloudinary.js";
+import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiError } from "../utils/ApiError.js";
 import generateOTP from "../utils/generateOTP.js";
 import verifyOtpTemplate from "../utils/verifyOtpTemplate.js";
@@ -19,43 +16,41 @@ import jwt from "jsonwebtoken";
 
 dotenv.config();
 
-// register user
+/**
+ * @desc    Register a new user and dispatch a secure verification token link via email
+ * @route   POST /api/v1/users/register
+ * @access  Public
+ * @note    FUTURE: Implement a rate-limiter layer specific to registration endpoints to prevent SMTP spam vectors.
+ */
 export const registerUserController = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
-  // 1. Required fields check
   if (!name || !email || !password) {
     throw new ApiError(400, "Name, email and password are required");
   }
 
-  // 2. Check existing user
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new ApiError(400, "Email already registered. Please login.");
   }
 
-  // 3. Hash password
   const salt = await bcryptjs.genSalt(12);
   const hashedPassword = await bcryptjs.hash(password, salt);
 
-  // 4. Generate verification token
   const emailVerifyToken = crypto.randomBytes(32).toString("hex");
 
-  // 5. Create new user
   const newUser = new User({
     name,
     email,
     password: hashedPassword,
     email_verify_token: emailVerifyToken,
-    email_verify_expiry: Date.now() + 3600000, // 1 hour
+    email_verify_expiry: Date.now() + 3600000,
   });
 
   await newUser.save();
 
-  // 6. Generate verification URL
   const verifyEmailUrl = `${process.env.FRONTEND_URL}/verify-email?token=${emailVerifyToken}`;
 
-  // 7. Send verification email
   await sendEmail({
     sendTo: email,
     subject: "Verify your email - GroStore",
@@ -65,7 +60,6 @@ export const registerUserController = asyncHandler(async (req, res) => {
     }),
   });
 
-  // 8. Success response using ApiResponse
   return res
     .status(201)
     .json(
@@ -77,7 +71,11 @@ export const registerUserController = asyncHandler(async (req, res) => {
     );
 });
 
-// verify user email
+/**
+ * @desc    Verify user email status using unique hexadecimal query/body tokens
+ * @route   GET/POST /api/v1/users/verify-email
+ * @access  Public
+ */
 export const verifyEmailController = asyncHandler(async (req, res) => {
   const token = req.query.token || req.body.token;
 
@@ -94,13 +92,11 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid or expired verification link");
   }
 
-  // Verify and clean up
   user.verify_email = true;
   user.email_verify_token = null;
   user.email_verify_expiry = null;
   await user.save();
 
-  // Success response using ApiResponse
   return res
     .status(200)
     .json(
@@ -112,7 +108,12 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
     );
 });
 
-// login a user
+/**
+ * @desc    Authenticate user credentials, update login timeline, and establish HttpOnly cookies
+ * @route   POST /api/v1/users/login
+ * @access  Public
+ * @note    FUTURE: Add IP tracking and multi-failure account locking policies to counter brute-force vectors.
+ */
 export const loginUserController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -135,16 +136,13 @@ export const loginUserController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid email or password");
   }
 
-  // Generate Tokens
   const accessToken = generateAccessToken(user);
   const refreshToken = await generateRefreshToken(user._id);
 
-  // Update last login date (Fixed - No warning)
   await User.findByIdAndUpdate(user._id, {
     last_login_date: new Date(),
   });
 
-  // Cookie options
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -152,15 +150,14 @@ export const loginUserController = asyncHandler(async (req, res) => {
     path: "/",
   };
 
-  // Set cookies
   res.cookie("accessToken", accessToken, {
     ...cookieOptions,
-    maxAge: 5 * 60 * 60 * 1000, // 5 hours
+    maxAge: 5 * 60 * 60 * 1000,
   });
 
   res.cookie("refreshToken", refreshToken, {
     ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   return res.status(200).json(
@@ -178,10 +175,13 @@ export const loginUserController = asyncHandler(async (req, res) => {
   );
 });
 
-// get user details
+/**
+ * @desc    Retrieve profile data for the currently authenticated session resource
+ * @route   GET /api/v1/users/me
+ * @access  Private
+ */
 export const userDetailsController = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
-  console.log(userId);
 
   if (!userId) {
     throw new ApiError(400, "Unauthorized Access");
@@ -194,15 +194,17 @@ export const userDetailsController = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new ApiResponse(
       200,
-      {
-        user,
-      },
+      { user },
       "User details fetched successfully",
     ),
   );
 });
 
-// logout user
+/**
+ * @desc    Clear authorization tokens from cookies and neutralize refresh tracking states
+ * @route   POST /api/v1/users/logout
+ * @access  Private
+ */
 export const logoutUserController = asyncHandler(async (req, res) => {
   const cookieOptions = {
     httpOnly: true,
@@ -228,23 +230,25 @@ export const logoutUserController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Logged out successfully"));
 });
 
-// update avatar
+/**
+ * @desc    Upload new profile image stream to Cloudinary and synchronize model storage
+ * @route   PATCH /api/v1/users/avatar
+ * @access  Private
+ * @note    FUTURE: Integrate sharp/stream pipelines to compress assets locally prior to Cloudinary egress.
+ */
 export const updateAvatarController = asyncHandler(async (req, res) => {
-  // Check if file exists (Multer puts it in req.file)
   if (!req.file) {
     throw new ApiError(400, "Avatar file is required");
   }
 
-  // Get current user from authMiddleware
   const user = req.user;
   if (!user) {
     throw new ApiError(401, "Unauthorized - Please login first");
   }
 
-  // Upload to Cloudinary
   const cloudinaryResult = await uploadOnCloudinary(
     req.file.buffer,
-    req.file.originalname || "avatar.jpg", // fallback filename
+    req.file.originalname || "avatar.jpg",
   );
 
   if (!cloudinaryResult || !cloudinaryResult.secure_url) {
@@ -253,16 +257,13 @@ export const updateAvatarController = asyncHandler(async (req, res) => {
 
   const newAvatarUrl = cloudinaryResult.secure_url;
 
-  // Delete old avatar if exists
   if (user.avatar && user.avatar !== "") {
     await deleteFromCloudinary(user.avatar);
   }
 
-  // Update user
   user.avatar = newAvatarUrl;
   await user.save({ validateBeforeSave: false });
 
-  // Success
   return res
     .status(200)
     .json(
@@ -274,7 +275,11 @@ export const updateAvatarController = asyncHandler(async (req, res) => {
     );
 });
 
-// update user details
+/**
+ * @desc    Modify subset updates of localized user master metadata variables
+ * @route   PUT /api/v1/users/profile
+ * @access  Private
+ */
 export const updateUserDetailsController = asyncHandler(async (req, res) => {
   const user = req.user;
   if (!user) {
@@ -287,7 +292,6 @@ export const updateUserDetailsController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "At least one field is required to update");
   }
 
-  // Optional validation
   if (name && name.trim().length < 2) {
     throw new ApiError(400, "Name must be at least 2 characters long");
   }
@@ -313,7 +317,11 @@ export const updateUserDetailsController = asyncHandler(async (req, res) => {
   );
 });
 
-// forgot password
+/**
+ * @desc    Dispatch secure hashed operational reset OTP structures via SMTP layers
+ * @route   POST /api/v1/users/forgot-password
+ * @access  Public
+ */
 export const forgotPasswordController = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -322,21 +330,18 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-
   if (!user) {
     throw new ApiError(400, "User not available");
   }
-  // console.log(user);
 
   const otp = generateOTP();
-
   const hashedOtp = crypto
     .createHash("sha256")
     .update(otp.toString())
     .digest("hex");
 
   user.forgot_password_otp = hashedOtp;
-  user.forgot_password_expiry = Date.now() + 60 * 60 * 1000; // 1 hour
+  user.forgot_password_expiry = Date.now() + 60 * 60 * 1000;
 
   await user.save({ validateBeforeSave: false });
 
@@ -348,56 +353,66 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
       otp,
     }),
   });
+
   return res
     .status(200)
     .json(new ApiResponse(200, null, "OTP sent to your email"));
 });
 
-// verify forgot password otp
-export const verifyForgotPasswordOtpController = asyncHandler(
-  async (req, res) => {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
-      throw new ApiError(400, "Email and otp are required");
-    }
-    const user = await User.findOne({ email }).select(
-      "+forgot_password_otp +forgot_password_expiry",
+/**
+ * @desc    Validate inbound identity OTP payload hashes against database state definitions
+ * @route   POST /api/v1/users/verify-otp
+ * @access  Public
+ */
+export const verifyForgotPasswordOtpController = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    throw new ApiError(400, "Email and otp are required");
+  }
+
+  const user = await User.findOne({ email }).select(
+    "+forgot_password_otp +forgot_password_expiry",
+  );
+
+  if (!user) {
+    throw new ApiError(400, "User not found");
+  }
+
+  if (!user.forgot_password_expiry || user.forgot_password_expiry < Date.now()) {
+    throw new ApiError(400, "OTP expired. Please request a new one.");
+  }
+
+  const hashedOtp = crypto
+    .createHash("sha256")
+    .update(otp.toString())
+    .digest("hex");
+
+  if (hashedOtp !== user.forgot_password_otp) {
+    throw new ApiError(400, "Invalid OTP");
+  }
+
+  await User.findByIdAndUpdate(user?._id, {
+    forgot_password_otp: "",
+    forgot_password_expiry: "",
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        null,
+        "OTP verified successfully. You can now reset your password.",
+      ),
     );
-    if (!user) {
-      throw new ApiError(400, "User not found");
-    }
-    if (
-      !user.forgot_password_expiry ||
-      user.forgot_password_expiry < Date.now()
-    ) {
-      throw new ApiError(400, "OTP expired. Please request a new one.");
-    }
-    const hashedOtp = crypto
-      .createHash("sha256")
-      .update(otp.toString())
-      .digest("hex");
+});
 
-    if (hashedOtp !== user.forgot_password_otp) {
-      throw new ApiError(400, "Invalid OTP");
-    }
-
-    const updateUser = await User.findByIdAndUpdate(user?._id, {
-      forgot_password_otp: "",
-      forgot_password_expiry: "",
-    });
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          null,
-          "OTP verified successfully. You can now reset your password.",
-        ),
-      );
-  },
-);
-
-// reset forgot pass
+/**
+ * @desc    Overwrite existing password credentials using verified multi-stage validation checks
+ * @route   POST /api/v1/users/reset-password
+ * @access  Public
+ */
 export const resetPasswordController = asyncHandler(async (req, res) => {
   const { email, otp, newPassword, confirmPassword } = req.body;
 
@@ -408,12 +423,10 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     );
   }
 
-  // confirm password check
   if (newPassword !== confirmPassword) {
     throw new ApiError(400, "Password and confirm password do not match");
   }
 
-  // optional strong password check
   if (newPassword.length < 8) {
     throw new ApiError(400, "Password must be at least 8 characters long");
   }
@@ -426,10 +439,7 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "User not found");
   }
 
-  if (
-    !user.forgot_password_expiry ||
-    user.forgot_password_expiry < Date.now()
-  ) {
+  if (!user.forgot_password_expiry || user.forgot_password_expiry < Date.now()) {
     throw new ApiError(400, "OTP expired");
   }
 
@@ -442,11 +452,9 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid OTP");
   }
 
-  // hash new password
   const salt = await bcryptjs.genSalt(12);
   user.password = await bcryptjs.hash(newPassword, salt);
 
-  // cleanup OTP (one-time use)
   user.forgot_password_otp = null;
   user.forgot_password_expiry = null;
 
@@ -457,7 +465,12 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Password reset successfully"));
 });
 
-// refresh token
+/**
+ * @desc    Validate active refresh JSON web tokens and issue rotational access tokens
+ * @route   POST /api/v1/users/refresh-token
+ * @access  Public
+ * @note    FUTURE: Implement token reuse detection (Automatic family revocation) to protect compromised refresh keys.
+ */
 export const refreshTokenController = asyncHandler(async (req, res) => {
   const refreshToken =
     req?.cookies?.refreshToken ||
@@ -474,7 +487,6 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid or expired refresh token");
   }
 
-  // IMPORTANT: Fetch user WITH refresh_token field
   const user = await User.findById(decode?.id).select("+refresh_token");
 
   if (!user) {
@@ -499,7 +511,7 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
 
   res.cookie("accessToken", newAccessToken, {
     ...cookieOptions,
-    maxAge: 5 * 60 * 60 * 1000, // 5 hours
+    maxAge: 5 * 60 * 60 * 1000,
   });
 
   return res
