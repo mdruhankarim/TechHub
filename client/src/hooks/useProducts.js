@@ -22,7 +22,7 @@ export const useGetCategories = () => {
     staleTime: 15 * 60 * 1000,
   });
 };
-
+// 
 export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: ["featuredProducts"],
