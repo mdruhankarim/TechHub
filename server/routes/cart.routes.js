@@ -1,17 +1,21 @@
 import { Router } from "express";
-import adminAuthMiddleware from "../middleware/adminMiddleware.js";
+
+import authMiddleware from "../middleware/authMiddleware.js";
 import {
   addToCartController,
-  getCartController,
-  removeFromCartController,
+  clearCartController,
+  removeFromCart,
 } from "../controllers/cart.controller.js";
 
 const cartRouter = Router();
 
-cartRouter.use(adminAuthMiddleware);
+cartRouter.use(authMiddleware);
 
-cartRouter.post("/", addToCartController);
-cartRouter.delete("/:productId", removeFromCartController);
-cartRouter.get("/", getCartController);
+/**
+ * CART
+ */
+cartRouter.post("/addToCart", addToCartController);
+cartRouter.patch("/removeFromCart", removeFromCart);
+cartRouter.delete("/clearCart", clearCartController);
 
 export default cartRouter;
