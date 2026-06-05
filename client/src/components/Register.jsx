@@ -10,11 +10,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Mail, Lock, User, Shield } from "lucide-react";
 import registerImage from "@/assets/register.png";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useRegisterUser } from "@/hooks/user.query";
+import { AuthToast } from "./common/AuthToast";
 
 const SignupForm = () => {
+  const { mutate, isPending, error } = useRegisterUser();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const navigate = useNavigate();
 
   const {
     register,
@@ -26,8 +30,27 @@ const SignupForm = () => {
   const password = watch("password");
 
   const onSubmit = (data) => {
-    const { confirmPassword, terms, ...rest } = data;
-    console.log("Signup data:", rest);
+    // const { confirmPassword, terms, ...rest } = data;
+    // console.log(data);
+
+    mutate(data, {
+      onSuccess: (response) => {
+        // console.log(response);
+        AuthToast.success(response?.message || "User Registered Successfully");
+
+        if (response?.statusCode === 200) {
+          navigate("/");
+        }
+      },
+
+      onError: (err) => {
+        AuthToast.error(
+          err?.response?.data?.message || "Invalid email or password",
+        );
+        console.log(err);
+      },
+    });
+    // console.log("Signup data:", rest);
   };
 
   return (
@@ -59,18 +82,18 @@ const SignupForm = () => {
 
             {/* Full Name */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="fullName" className="text-sm font-semibold">
+              <Label htmlFor="name" className="text-sm font-semibold">
                 Full Name
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="fullName"
+                  id="name"
                   type="text"
-                  placeholder="Enter your full name"
+                  placeholder="Enter your  name"
                   className="pl-10 h-11 border-gray-300 focus:border-black"
-                  {...register("fullName", {
-                    required: "Full name is required",
+                  {...register("name", {
+                    required: "Name is required",
                     minLength: {
                       value: 2,
                       message: "Name must be at least 2 characters",
@@ -78,10 +101,8 @@ const SignupForm = () => {
                   })}
                 />
               </div>
-              {errors.fullName && (
-                <p className="text-xs text-red-500">
-                  {errors.fullName.message}
-                </p>
+              {errors.name && (
+                <p className="text-xs text-red-500">{errors.name.message}</p>
               )}
             </div>
 
